@@ -23,7 +23,28 @@ function cleanDir(dir) {
   }
 }
 
+function channelOutDir(name) {
+  return path.join(STREAM_DIR, name);
+}
+
+function channelManifestPath(name) {
+  return path.join(channelOutDir(name), "live.m3u8");
+}
+
+function listChannels() {
+  if (!fs.existsSync(STREAM_DIR)) return [];
+  return fs.readdirSync(STREAM_DIR)
+    .filter((n) => fs.existsSync(channelManifestPath(n)))
+    .map((name) => ({
+      name,
+      running: channelProcesses.has(name),
+      manifest: `/stream/${name}/live.m3u8`
+    }));
+}
+
 app.get("/health", async () => ({ ok: true }));
+
+app.get("/channels", async () => ({ ok: true, channels: listChannels() }));
 
 app.post("/channels/:name/start", async (req, reply) => {
   const { name } = req.params;
@@ -35,7 +56,7 @@ app.post("/channels/:name/start", async (req, reply) => {
     return reply.code(400).send({ ok: false, error: `Audio not found: ${input}` });
   }
 
-  const outDir = path.join(STREAM_DIR, name);
+  const outDir = channelOutDir(name);
   ensureDir(outDir);
   cleanDir(outDir);
 
@@ -57,9 +78,7 @@ app.post("/channels/:name/start", async (req, reply) => {
   const ffmpeg = spawn("ffmpeg", args, { stdio: "ignore" });
   channelProcesses.set(name, ffmpeg);
 
-  ffmpeg.on("exit", () => {
-    channelProcesses.delete(name);
-  });
+  ffmpeg.on("exit", () => channelProcesses.delete(name));
 
   return {
     ok: true,
@@ -84,10 +103,13 @@ app.post("/channels/:name/stop", async (req, reply) => {
 app.get("/channels/:name/now", async (req) => {
   const { name } = req.params;
   const running = channelProcesses.has(name);
+  const manifestExists = fs.existsSync(channelManifestPath(name));
 
   return {
     channel: name,
     running,
+    manifestExists,
+    manifest: manifestExists ? `/stream/${name}/live.m3u8` : null,
     trackTitle: running ? "Sample English Lesson" : null,
     sentence: running ? "Welcome to Chunshik English Radio." : null,
     level: "beginner"

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>English Radio MVP</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0b1020; color: #e5e7eb; margin: 0; }
+      .wrap { max-width: 760px; margin: 40px auto; padding: 24px; background: #121a31; border-radius: 16px; }
+      h1 { margin-top: 0; }
+      input, button { padding: 10px 12px; border-radius: 10px; border: 1px solid #2a355e; background: #0f1730; color: #e5e7eb; }
+      button { cursor: pointer; background: #2b59ff; border: 0; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+      .muted { color: #9ca3af; font-size: 14px; }
+      .card { margin-top: 16px; padding: 14px; background: #0f1730; border-radius: 12px; }
+      audio { width: 100%; margin-top: 10px; }
+      code { color: #93c5fd; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>🎧 English Radio MVP</h1>
+      <p class="muted">채널명을 넣고 재생하세요. 기본 채널: <code>beginner</code></p>
+
+      <div class="row">
+        <input id="channel" value="beginner" />
+        <button id="playBtn">재생</button>
+        <button id="refreshBtn">상태 새로고침</button>
+      </div>
+
+      <audio id="audio" controls autoplay></audio>
+
+      <div class="card">
+        <div id="status">상태: 대기 중</div>
+        <div id="now" class="muted"></div>
+      </div>
+    </div>
+
+    <script>
+      const audio = document.getElementById('audio');
+      const channelInput = document.getElementById('channel');
+      const statusEl = document.getElementById('status');
+      const nowEl = document.getElementById('now');
+
+      function manifestUrl(name) {
+        return `/stream/${name}/live.m3u8`;
+      }
+
+      async function refreshNow() {
+        const ch = channelInput.value.trim() || 'beginner';
+        const res = await fetch(`/api/channels/${ch}/now`);
+        const data = await res.json();
+        statusEl.textContent = `상태: ${data.running ? '송출 중' : '정지'} / manifest: ${data.manifestExists ? '있음' : '없음'}`;
+        nowEl.textContent = data.sentence ? `${data.trackTitle} — ${data.sentence}` : '현재 재생 정보 없음';
+      }
+
+      function play() {
+        const ch = channelInput.value.trim() || 'beginner';
+        const src = manifestUrl(ch);
+
+        if (window.Hls && Hls.isSupported()) {
+          const hls = new Hls();
+          hls.loadSource(src);
+          hls.attachMedia(audio);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => audio.play().catch(() => {}));
+          statusEl.textContent = `상태: 재생 시도 중 (${src})`;
+        } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+          audio.src = src;
+          audio.play().catch(() => {});
+          statusEl.textContent = `상태: 재생 시도 중 (${src})`;
+        } else {
+          statusEl.textContent = '브라우저가 HLS를 지원하지 않습니다.';
+        }
+      }
+
+      document.getElementById('playBtn').addEventListener('click', play);
+      document.getElementById('refreshBtn').addEventListener('click', refreshNow);
+      refreshNow();
+    </script>
+  </body>
+</html>
