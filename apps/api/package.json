@@ -1,0 +1,11 @@
+{
+  "name": "english-radio-api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/server.js"
+  },
+  "dependencies": {
+    "fastify": "^4.28.1"
+  }
+}

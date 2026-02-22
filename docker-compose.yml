@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: er_postgres
+    environment:
+      POSTGRES_USER: er
+      POSTGRES_PASSWORD: erpass
+      POSTGRES_DB: english_radio
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: er_redis
+    ports:
+      - "6379:6379"
+
+  api:
+    image: node:20-alpine
+    container_name: er_api
+    working_dir: /app
+    command: sh -c "npm i && npm run dev"
+    volumes:
+      - ./apps/api:/app
+      - ./stream:/stream
+      - ./assets:/assets
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://er:erpass@postgres:5432/english_radio
+      REDIS_URL: redis://redis:6379
+      STREAM_DIR: /stream
+      ASSET_DIR: /assets
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+
+  nginx:
+    image: nginx:alpine
+    container_name: er_nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./stream:/usr/share/nginx/html/stream:ro
+      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+
+volumes:
+  pg_data:
