@@ -63,3 +63,18 @@ docs                문서
 - `wrangler.toml`, `worker.js` 포함
 - `.github/workflows/build-and-upload-hls.yml` 로 HLS 생성 후 R2 업로드
 - 자세한 절차: `docs/cloudflare-deploy.md`
+
+
+## 다중 파일 자동 순환 편성
+- 채널별 파일 위치: `assets/<channel>/*.mp3`
+- 예시:
+  - `assets/beginner/lesson1.mp3`
+  - `assets/beginner/lesson2.mp3`
+  - `assets/business/meeting1.mp3`
+- 실행:
+```bash
+curl -X POST http://localhost:8080/api/channels/beginner/start
+curl -X POST http://localhost:8080/api/channels/business/start
+```
+- 보조 API:
+  - `GET /api/assets/channels` (채널별 소스 파일 확인)

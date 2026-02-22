@@ -20,18 +20,51 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Build HLS files
+      - name: Build HLS files per channel
         run: |
-          mkdir -p out/stream/beginner
-          if [ -f assets/sample.mp3 ]; then
-            ffmpeg -y -stream_loop -1 -i assets/sample.mp3 \
-              -t 1800 \
+          mkdir -p out/stream
+          if [ ! -d assets ]; then
+            echo "assets directory not found" && exit 1
+          fi
+
+          shopt -s nullglob
+          channels=(assets/*)
+          built_any=0
+
+          for c in "${channels[@]}"; do
+            [ -d "$c" ] || continue
+            ch_name=$(basename "$c")
+            files=("$c"/*.mp3 "$c"/*.m4a "$c"/*.aac "$c"/*.wav)
+            real_files=()
+            for f in "${files[@]}"; do
+              [ -f "$f" ] && real_files+=("$f")
+            done
+
+            if [ ${#real_files[@]} -eq 0 ]; then
+              echo "skip channel $ch_name (no audio files)"
+              continue
+            fi
+
+            mkdir -p "out/stream/$ch_name"
+
+            concat_list="out/${ch_name}_concat.txt"
+            : > "$concat_list"
+            for f in "${real_files[@]}"; do
+              abs=$(realpath "$f")
+              echo "file '$abs'" >> "$concat_list"
+            done
+
+            ffmpeg -y -re -f concat -safe 0 -i "$concat_list" \
               -c:a aac -b:a 128k -ar 44100 -ac 2 \
               -f hls -hls_time 6 -hls_list_size 10 -hls_flags delete_segments+append_list \
-              -hls_segment_filename out/stream/beginner/seg_%05d.ts \
-              out/stream/beginner/live.m3u8
-          else
-            echo "assets/sample.mp3 not found. Skipping." && exit 1
+              -hls_segment_filename "out/stream/$ch_name/seg_%05d.ts" \
+              "out/stream/$ch_name/live.m3u8"
+
+            built_any=1
+          done
+
+          if [ "$built_any" -eq 0 ]; then
+            echo "No channel assets found under assets/<channel>/*.mp3" && exit 1
           fi
 
       - name: Upload to Cloudflare R2
