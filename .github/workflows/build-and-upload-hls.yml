@@ -64,10 +64,22 @@ jobs:
           done
 
           if [ "$built_any" -eq 0 ]; then
-            echo "No channel assets found under assets/<channel>/*.mp3" && exit 1
+            echo "No channel assets found under assets/<channel>/*.{mp3,m4a,aac,wav}. Skip upload gracefully."
+            mkdir -p out/stream
+            echo "skip" > out/.skip_upload
+          fi
+
+      - name: Check upload precondition
+        id: precheck
+        run: |
+          if [ -f out/.skip_upload ]; then
+            echo "should_upload=false" >> $GITHUB_OUTPUT
+          else
+            echo "should_upload=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Upload to Cloudflare R2
+        if: steps.precheck.outputs.should_upload == 'true'
         uses: ryand56/r2-upload-action@latest
         with:
           r2-account-id: ${{ secrets.CF_ACCOUNT_ID }}
@@ -76,3 +88,9 @@ jobs:
           r2-bucket: english-radio-stream
           source-dir: out
           destination-dir: .
+
+      - name: Skip notice
+        if: steps.precheck.outputs.should_upload == 'false'
+        run: echo "No audio assets to build/upload. Job finished without failure."
+
+      # duplicate upload block removed
