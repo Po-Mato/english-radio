@@ -78,3 +78,31 @@ curl -X POST http://localhost:8080/api/channels/business/start
 ```
 - 보조 API:
   - `GET /api/assets/channels` (채널별 소스 파일 확인)
+
+
+## 텍스트(TXT) -> TTS -> 스트리밍
+채널별 텍스트 대본을 두고 mp3를 자동 생성할 수 있습니다.
+
+### 폴더 구조
+- `scripts/<channel>/*.txt` : 원본 대본
+- `assets/<channel>/*.mp3` : 생성된 오디오
+
+### API 방식 (권장)
+```bash
+# 1) TXT를 MP3로 생성
+curl -X POST http://localhost:8080/api/tts/build/beginner   -H "Content-Type: application/json"   -d '{"overwrite": true}'
+
+# 2) 채널 송출 시작
+curl -X POST http://localhost:8080/api/channels/beginner/start
+```
+
+### 로컬 스크립트 방식(macOS)
+```bash
+./tools/txt_to_tts.sh beginner
+curl -X POST http://localhost:8080/api/channels/beginner/start
+```
+
+### 참고
+- 기본 음성은 macOS `say`의 `Samantha` 사용
+- API 컨테이너에서 `/api/tts/build/*`를 쓰려면 호스트 macOS의 `say`가 아닌 별도 TTS 엔진으로 교체가 필요합니다.
+  (현재 구현은 로컬 실행/개발용 기준)

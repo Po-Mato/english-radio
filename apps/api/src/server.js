@@ -8,6 +8,9 @@ const app = Fastify({ logger: true });
 const PORT = process.env.PORT || 3000;
 const STREAM_DIR = process.env.STREAM_DIR || "/stream";
 const ASSET_DIR = process.env.ASSET_DIR || "/assets";
+const SCRIPT_DIR = process.env.SCRIPT_DIR || path.resolve(process.cwd(), "../../scripts");
+const TTS_LANG = process.env.TTS_LANG || "en";
+const TTS_VOICE = process.env.TTS_VOICE || "Samantha"; // macOS say voice
 
 /** @type {Map<string, import('node:child_process').ChildProcess>} */
 const channelProcesses = new Map();
@@ -51,6 +54,15 @@ function discoverChannelAssets(channelName) {
     .map((f) => path.join(dir, f));
 }
 
+function discoverChannelScripts(channelName) {
+  const dir = path.join(SCRIPT_DIR, channelName);
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter((f) => /\.txt$/i.test(f))
+    .sort()
+    .map((f) => path.join(dir, f));
+}
+
 function buildConcatArgs(files, outDir) {
   const filterInputs = [];
   const concatInputs = [];
@@ -73,6 +85,28 @@ function buildConcatArgs(files, outDir) {
   ];
 }
 
+function runCommand(cmd, args) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(cmd, args, { stdio: "inherit" });
+    p.on("exit", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${cmd} failed with code ${code}`));
+    });
+  });
+}
+
+async function renderTextToMp3({ txtPath, outMp3Path }) {
+  const tempAiff = outMp3Path.replace(/\.mp3$/i, ".aiff");
+  const text = fs.readFileSync(txtPath, "utf8").trim();
+  if (!text) throw new Error(`Empty script: ${txtPath}`);
+
+  // macOS say -> AIFF
+  await runCommand("say", ["-v", TTS_VOICE, "-o", tempAiff, text]);
+  // ffmpeg -> mp3
+  await runCommand("ffmpeg", ["-y", "-i", tempAiff, "-ar", "44100", "-ac", "2", "-b:a", "128k", outMp3Path]);
+  fs.rmSync(tempAiff, { force: true });
+}
+
 app.get("/health", async () => ({ ok: true }));
 app.get("/channels", async () => ({ ok: true, channels: listChannels() }));
 
@@ -85,6 +119,47 @@ app.get("/assets/channels", async () => {
       files: discoverChannelAssets(name).map((p) => path.basename(p))
     }));
   return { ok: true, channels };
+});
+
+app.get("/scripts/channels", async () => {
+  if (!fs.existsSync(SCRIPT_DIR)) return { ok: true, channels: [] };
+  const channels = fs.readdirSync(SCRIPT_DIR)
+    .filter((n) => fs.existsSync(path.join(SCRIPT_DIR, n)) && fs.lstatSync(path.join(SCRIPT_DIR, n)).isDirectory())
+    .map((name) => ({
+      name,
+      files: discoverChannelScripts(name).map((p) => path.basename(p))
+    }));
+  return { ok: true, channels };
+});
+
+app.post("/tts/build/:name", async (req, reply) => {
+  const { name } = req.params;
+  const body = req.body || {};
+  const overwrite = Boolean(body.overwrite ?? false);
+
+  const scriptFiles = discoverChannelScripts(name);
+  if (!scriptFiles.length) {
+    return reply.code(400).send({ ok: false, error: `No script files found under scripts/${name}/*.txt` });
+  }
+
+  const outDir = path.join(ASSET_DIR, name);
+  ensureDir(outDir);
+
+  const built = [];
+  for (const txtPath of scriptFiles) {
+    const base = path.basename(txtPath, ".txt");
+    const mp3Path = path.join(outDir, `${base}.mp3`);
+    if (!overwrite && fs.existsSync(mp3Path)) continue;
+    await renderTextToMp3({ txtPath, outMp3Path: mp3Path });
+    built.push(path.basename(mp3Path));
+  }
+
+  return {
+    ok: true,
+    channel: name,
+    built,
+    outDir: `assets/${name}`
+  };
 });
 
 app.post("/channels/:name/start", async (req, reply) => {
