@@ -88,6 +88,11 @@
         <button id="refreshBtn" class="secondary">상태</button>
       </div>
 
+      <div class="row">
+        <input id="streamBase" placeholder="스트림 베이스 URL (선택)" />
+        <button id="saveBaseBtn" class="secondary">저장</button>
+      </div>
+
       <audio id="audio" controls playsinline></audio>
 
       <section class="card" aria-live="polite">
@@ -111,8 +116,10 @@
         pillEl.textContent = running ? 'LIVE' : '대기';
       }
 
+      const STREAM_BASE = localStorage.getItem('stream_base') || '';
+
       function manifestUrl(name) {
-        return `/stream/${name}/live.m3u8`;
+        return `${STREAM_BASE}/stream/${name}/live.m3u8`;
       }
 
       async function refreshNow() {
@@ -180,6 +187,14 @@
 
         if (!isRetry) refreshNow().catch(() => {});
       }
+
+
+      const streamBaseInput = document.getElementById('streamBase');
+      streamBaseInput.value = STREAM_BASE;
+      document.getElementById('saveBaseBtn').addEventListener('click', () => {
+        localStorage.setItem('stream_base', streamBaseInput.value.trim());
+        setStatus('스트림 베이스 URL 저장됨. 재생 버튼을 다시 눌러주세요.', false);
+      });
 
       document.getElementById('playBtn').addEventListener('click', () => play(false));
       document.getElementById('refreshBtn').addEventListener('click', () => refreshNow());

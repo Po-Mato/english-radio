@@ -1,0 +1,45 @@
+name: Build and Upload HLS to R2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "assets/**"
+      - ".github/workflows/build-and-upload-hls.yml"
+
+jobs:
+  hls:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Build HLS files
+        run: |
+          mkdir -p out/stream/beginner
+          if [ -f assets/sample.mp3 ]; then
+            ffmpeg -y -stream_loop -1 -i assets/sample.mp3 \
+              -t 1800 \
+              -c:a aac -b:a 128k -ar 44100 -ac 2 \
+              -f hls -hls_time 6 -hls_list_size 10 -hls_flags delete_segments+append_list \
+              -hls_segment_filename out/stream/beginner/seg_%05d.ts \
+              out/stream/beginner/live.m3u8
+          else
+            echo "assets/sample.mp3 not found. Skipping." && exit 1
+          fi
+
+      - name: Upload to Cloudflare R2
+        uses: ryand56/r2-upload-action@latest
+        with:
+          r2-account-id: ${{ secrets.CF_ACCOUNT_ID }}
+          r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          r2-bucket: english-radio-stream
+          source-dir: out
+          destination-dir: .

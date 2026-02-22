@@ -1,0 +1,8 @@
+name = "english-radio-worker"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[[r2_buckets]]
+binding = "AUDIO_BUCKET"
+bucket_name = "english-radio-stream"
+preview_bucket_name = "english-radio-stream"

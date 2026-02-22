@@ -57,3 +57,9 @@ docs                문서
 ## 주의
 - `stream/`, `assets/` 실데이터는 git에 커밋하지 않음
 - 프로덕션은 오브젝트 스토리지(R2/S3) + CDN + 워커/큐 분리 권장
+
+
+## Cloudflare 배포 (0원 근접)
+- `wrangler.toml`, `worker.js` 포함
+- `.github/workflows/build-and-upload-hls.yml` 로 HLS 생성 후 R2 업로드
+- 자세한 절차: `docs/cloudflare-deploy.md`
