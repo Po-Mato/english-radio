@@ -30,6 +30,13 @@ curl -X POST http://localhost:8080/api/channels/beginner/start \
 - 웹 플레이어: `http://localhost:8080/`
 - HLS 원본 URL: `http://localhost:8080/stream/beginner/live.m3u8`
 
+
+## 모바일/PWA 지원
+- 모바일 브라우저 실시간 청취(HLS)
+- 끊김 시 자동 재연결 로직
+- Media Session 메타데이터(잠금화면/제어센터 노출)
+- PWA 설치 지원(홈 화면 추가)
+
 ## API
 - `GET /api/health`
 - `GET /api/channels`
